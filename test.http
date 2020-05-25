@@ -1,0 +1,6 @@
+GET https://funcnsg-app.azurewebsites.net/api/httpoutbound
+
+
+###
+
+GET https://funcnsg-app.azurewebsites.net/api/HttpTriggerCSharp1?name=michael&code=[something]

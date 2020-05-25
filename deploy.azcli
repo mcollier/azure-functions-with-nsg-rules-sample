@@ -1,0 +1,29 @@
+# Create resource group
+az group create --name functions-nsg-sample --location eastus
+
+# Create vnet
+az network vnet create -g functions-nsg-sample --location eastus --name demo-vnet --address-prefixes 10.200.0.0/16
+az network vnet subnet create -g functions-nsg-sample --name demo-subnet --vnet-name demo-vnet --address-prefixes 10.200.1.0/24
+
+# Create NSG rule(s)
+az network nsg create -g functions-nsg-sample -n my-nsg --location eastus
+az network vnet subnet update -g functions-nsg-sample --vnet-name demo-vnet -n demo-subnet --network-security-group my-nsg
+az network nsg rule create -g functions-nsg-sample --name disable-internet-out --nsg-name my-nsg --priority 400 --source-address-prefixes VirtualNetwork --destination-address-prefixes Internet --destination-port-ranges * --direction Outbound --access Deny --protocol * --description "Disable outbound internet"
+az network nsg rule create  -g functions-nsg-sample --name allow-azure-storage-outbound --nsg-name my-nsg --priority 250 --source-address-prefixes VirtualNetwork --destination-address-prefixes Storage --destination-port-ranges * --direction Outbound --access Allow --protocol * --description "Allow Azure Storage outbound"
+az network nsg rule create  -g functions-nsg-sample --name allow-azure-monitor-outbound --nsg-name my-nsg --priority 300 --source-address-prefixes VirtualNetwork --destination-address-prefixes AzureMonitor --destination-port-ranges * --direction Outbound --access Allow --protocol * --description "Allow Azure Monitor outbound"
+
+
+# Create Azure Function Premium plan
+az storage account create -g functions-nsg-sample -l eastus --name funcnsgstorage20200522 --sku Standard_LRS
+
+az functionapp plan create -g functions-nsg-sample --name funcnsg-plan --location eastus --sku EP1
+az functionapp create -g functions-nsg-sample --name funcnsg-app --storage-account funcnsgstorage20200522 --plan funcnsg-plan --functions-version 3 --runtime dotnet
+
+# Enable vnet integration
+az functionapp vnet-integration add --name funcnsg-app --vnet demo-vnet --subnet demo-subnet -g functions-nsg-sample
+
+# route all vnet traffic
+az functionapp config appsettings set -g functions-nsg-sample --name funcnsg-app --settings WEBSITE_VNET_ROUTE_ALL=1
+
+# Deploy code
+func azure functionapp publish funcnsg-app --publish-local-settings
